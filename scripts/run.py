@@ -24,6 +24,10 @@ from tqdm import tqdm
 
 import pyngp as ngp # noqa
 
+import imageio
+import matplotlib.pyplot as plt
+import cv2
+
 def parse_args():
 	parser = argparse.ArgumentParser(description="Run neural graphics primitives testbed with additional configuration & output options")
 
@@ -313,6 +317,9 @@ if __name__ == "__main__":
 		if not args.screenshot_frames:
 			args.screenshot_frames = range(len(ref_transforms["frames"]))
 		print(args.screenshot_frames)
+		
+		rgbs = []
+		depths = []
 		for idx in args.screenshot_frames:
 			f = ref_transforms["frames"][int(idx)]
 			cam_matrix = f["transform_matrix"]
@@ -323,10 +330,34 @@ if __name__ == "__main__":
 			if not os.path.splitext(outname)[1]:
 				outname = outname + ".png"
 
-			print(f"rendering {outname}")
+			print(f"rendering {outname} Color")
+			testbed.render_mode = ngp.Shade
 			image = testbed.render(args.width or int(ref_transforms["w"]), args.height or int(ref_transforms["h"]), args.screenshot_spp, True)
-			os.makedirs(os.path.dirname(outname), exist_ok=True)
-			write_image(outname, image)
+			image = (image * 255).astype(np.uint8)
+			rgbs.append(image)
+
+			print(f"rendering {outname} Depth")
+			testbed.render_mode = ngp.Depth
+			depthImage = testbed.render(args.width or int(ref_transforms["w"]), args.height or int(ref_transforms["h"]), args.screenshot_spp, True)
+			depthImage = cv2.cvtColor(depthImage, cv2.COLOR_BGR2GRAY)
+			
+			cmap = plt.cm.viridis
+			norm = plt.Normalize(vmin=depthImage.max()-200, vmax=depthImage.max())
+
+			# map the normalized data to colors
+			depthImage = (cmap(norm(depthImage)) * 255).astype(np.uint8)
+			depths.append(depthImage)
+
+			# os.makedirs(os.path.dirname(outname), exist_ok=True)
+			# write_image(outname, image)
+		print("Saving Color Video")
+		rgbs = np.stack(rgbs, 0)
+		imageio.mimwrite(os.path.join(os.path.dirname(outname),"rgb.mp4"), rgbs, fps=30, quality=8)
+
+		print("Saving Depth Video")
+		depths = np.stack(depths, 0)
+		imageio.mimwrite(os.path.join(os.path.dirname(outname),"depth.mp4"), depths, fps=30, quality=8)
+
 	elif args.screenshot_dir:
 		outname = os.path.join(args.screenshot_dir, args.scene + "_" + network_stem)
 		print(f"Rendering {outname}.png")
