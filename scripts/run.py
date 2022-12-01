@@ -316,11 +316,10 @@ if __name__ == "__main__":
 		testbed.fov = ref_transforms["camera_angle_x"] * 180 / np.pi
 		if not args.screenshot_frames:
 			args.screenshot_frames = range(len(ref_transforms["frames"]))
-		print(args.screenshot_frames)
-		
+
 		rgbs = []
 		depths = []
-		for idx in args.screenshot_frames:
+		for idx in tqdm(args.screenshot_frames):
 			f = ref_transforms["frames"][int(idx)]
 			cam_matrix = f["transform_matrix"]
 			testbed.set_nerf_camera_matrix(np.matrix(cam_matrix)[:-1,:])
@@ -330,13 +329,13 @@ if __name__ == "__main__":
 			if not os.path.splitext(outname)[1]:
 				outname = outname + ".png"
 
-			print(f"rendering {outname} Color")
+			# print(f"rendering {outname} Color")
 			testbed.render_mode = ngp.Shade
 			image = testbed.render(args.width or int(ref_transforms["w"]), args.height or int(ref_transforms["h"]), args.screenshot_spp, True)
 			image = (image * 255).astype(np.uint8)
 			rgbs.append(image)
 
-			print(f"rendering {outname} Depth")
+			# print(f"rendering {outname} Depth")
 			testbed.render_mode = ngp.Depth
 			depthImage = testbed.render(args.width or int(ref_transforms["w"]), args.height or int(ref_transforms["h"]), args.screenshot_spp, True)
 			depthImage = cv2.cvtColor(depthImage, cv2.COLOR_BGR2GRAY)
@@ -348,11 +347,9 @@ if __name__ == "__main__":
 			depthImage = (cmap(norm(depthImage)) * 255).astype(np.uint8)
 			depths.append(depthImage)
 
-			# os.makedirs(os.path.dirname(outname), exist_ok=True)
-			# write_image(outname, image)
 		print("Saving Color Video")
 		rgbs = np.stack(rgbs, 0)
-		imageio.mimwrite(os.path.join(os.path.dirname(outname),"rgb.mp4"), rgbs, fps=30, quality=8)
+		imageio.mimwrite(os.path.join(os.path.dirname(outname),"color.mp4"), rgbs, fps=30, quality=8)
 
 		print("Saving Depth Video")
 		depths = np.stack(depths, 0)
